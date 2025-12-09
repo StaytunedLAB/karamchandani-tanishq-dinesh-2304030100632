@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Attendance Processor — Demo</title>
+  <style>
+    /* ---------- Simple, modern CSS (beginner-friendly) ---------- */
+    :root{
+      --bg:#0f1724; /* dark navy */
+      --card:#0b1220;
+      --muted:#9aa7bf;
+      --accent:#7dd3fc;
+      --good:#10b981;
+      --bad:#fb7185;
+      --glass: rgba(255,255,255,0.03);
+      font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    }
+
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#071029 0%, #071725 100%);color:#e6eef8}
+    .wrap{max-width:980px;margin:40px auto;padding:24px;}
+
+    header{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+    header h1{font-size:20px;margin:0}
+    header p{margin:0;color:var(--muted);font-size:13px}
+
+    .grid{display:grid;grid-template-columns:1fr 380px;gap:20px}
+
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;padding:18px;box-shadow:0 6px 18px rgba(2,6,23,0.6);}
+
+    form .row{display:flex;gap:10px;margin-bottom:10px}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    input[type=text], input[type=date], input[type=time]{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:var(--glass);color:inherit;font-size:14px}
+    .half{flex:1}
+
+    .controls{display:flex;gap:8px;align-items:center;margin-top:12px}
+    button{background:var(--accent);border:0;padding:10px 14px;border-radius:8px;font-weight:600;color:#021126;cursor:pointer}
+    button.secondary{background:transparent;border:1px solid rgba(125,211,252,0.12);color:var(--accent)}
+
+    .small{font-size:13px;color:var(--muted)}
+
+    .output{white-space:pre-wrap;font-family:SFMono-Regular,Menlo,monospace;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));padding:12px;border-radius:10px;min-height:120px;color:#d6f7ff}
+
+    .status{display:inline-block;padding:6px 10px;border-radius:999px;font-weight:700}
+    .status.complete{background:rgba(16,185,129,0.12);color:var(--good)}
+    .status.incomplete{background:rgba(255,179,0,0.08);color:#ffcc66}
+    .status.invalid{background:rgba(251,113,133,0.08);color:var(--bad)}
+    .status.error{background:rgba(255,255,255,0.03);color:var(--muted)}
+
+    footer{margin-top:12px;color:var(--muted);font-size:12px}
+
+    @media (max-width:900px){
+      .grid{grid-template-columns:1fr;}
+      header{flex-direction:column;align-items:flex-start}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Employee Attendance Processor</h1>
+        <p class="small">Enter attendance values and press <strong>Process</strong>. This demo includes safe try/catch/finally handling.</p>
+      </div>
+    </header>
+
+    <div class="grid">
+      <div class="card">
+        <form id="attForm">
+
+          <div class="row">
+            <div class="half">
+              <label>Employee ID</label>
+              <input id="employeeId" type="text" placeholder="EMP101" value="EMP101" />
+            </div>
+            <div class="half">
+              <label>Date</label>
+              <input id="date" type="date" value="2025-01-20" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="half">
+              <label>Check-in time</label>
+              <input id="checkIn" type="time" value="09:00" />
+            </div>
+            <div class="half">
+              <label>Check-out time</label>
+              <input id="checkOut" type="time" value="18:30" />
+            </div>
+          </div>
+
+          <div style="margin-top:8px"><label>Break (optional)</label></div>
+          <div class="row" style="margin-bottom:6px">
+            <input id="breakStart" type="time" style="flex:1" placeholder="13:00" />
+            <input id="breakEnd" type="time" style="flex:1" placeholder="13:30" />
+          </div>
+
+          <div class="row" style="align-items:center;">
+            <label style="margin:0;display:flex;align-items:center;gap:8px"><input id="ot" type="checkbox" /> <span class="small">Overtime Approved</span></label>
+          </div>
+
+          <div class="controls">
+            <button type="button" id="processBtn">Process</button>
+            <button type="button" id="sampleBtn" class="secondary">Load Sample</button>
+            <div style="flex:1"></div>
+            <div class="small" id="auditLog">—</div>
+          </div>
+
+        </form>
+
+        <footer>
+          <div class="small">Note: If break end is missing a default of 30 minutes is assumed. Missing check-in/out marks day as <strong>incomplete</strong>.</div>
+        </footer>
+      </div>
+
+      <aside class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div>
+            <div class="small">Result</div>
+            <strong id="empLabel">EMP101 — 2025-01-20</strong>
+          </div>
+          <div id="statusPill" class="status complete">complete</div>
+        </div>
+
+        <div class="small" style="margin-bottom:8px">Summary</div>
+        <div id="summary" class="output">Press <strong>Process</strong> to run.</div>
+
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    // ------------------ Attendance logic (safe + beginner friendly) ------------------
+    function processAttendance(record) {
+      // Keep original safe
+      const data = JSON.parse(JSON.stringify(record));
+
+      let status = 'complete';
+      let totalWorkMinutes = 0;
+      let overtimeMinutes = 0;
+      let note = '';
+      let errorMessage = '';
+
+      try {
+        // Missing check-in/out
+        if (!data.checkIn || !data.checkOut) {
+          status = 'incomplete';
+          note = 'Missing check-in or check-out';
+          return buildResult();
+        }
+
+        // Convert to Date objects using local date + time
+        const checkInTime = new Date(data.date + ' ' + data.checkIn);
+        const checkOutTime = new Date(data.date + ' ' + data.checkOut);
+
+        if (isNaN(checkInTime) || isNaN(checkOutTime)) {
+          status = 'error';
+          errorMessage = 'Invalid time format';
+          note = 'Time conversion failed';
+          return buildResult();
+        }
+
+        // Basic work minutes
+        const workMinutes = (checkOutTime - checkInTime) / (1000 * 60);
+
+        // Break handling
+        let breakMinutes = 0;
+        if (data.break && data.break.start) {
+          if (data.break.end) {
+            const bStart = new Date(data.date + ' ' + data.break.start);
+            const bEnd = new Date(data.date + ' ' + data.break.end);
+            if (!isNaN(bStart) && !isNaN(bEnd)) {
+              breakMinutes = (bEnd - bStart) / (1000 * 60);
+            } else {
+              breakMinutes = 30; // default
+            }
+          } else {
+            breakMinutes = 30; // default
+          }
+        }
+
+        totalWorkMinutes = workMinutes - breakMinutes;
+
+        if (totalWorkMinutes < 0) {
+          status = 'invalid';
+          note = 'Negative working time';
+          totalWorkMinutes = 0;
+        }
+
+        // Overtime
+        if (data.overtimeApproved === true) {
+          if (totalWorkMinutes > 480) { // 8 hours
+            overtimeMinutes = Math.round(totalWorkMinutes - 480);
+          }
+        }
+
+        note = 'Attendance processed';
+
+      } catch (err) {
+        status = 'error';
+        errorMessage = err && err.message ? err.message : 'Unknown system error';
+        note = 'System error occurred';
+      } finally {
+        // Always run - audit log
+        // We expose it to UI
+        const log = 'Attendance processed successfully at ' + new Date().toLocaleString();
+        // attach to returned object via closure
+        resultAuditLog = log;
+      }
+
+      return buildResult();
+
+      function buildResult() {
+        return {
+          employeeId: data.employeeId || null,
+          date: data.date || null,
+          status,
+          totalWorkMinutes: Math.round(totalWorkMinutes),
+          overtimeMinutes: Math.round(overtimeMinutes),
+          note,
+          errorMessage: errorMessage || null,
+          auditLog: resultAuditLog || null
+        };
+      }
+    }
+
+    // ------------------ UI wiring ------------------
+    const $ = id => document.getElementById(id);
+
+    function readForm() {
+      return {
+        employeeId: $('employeeId').value.trim(),
+        date: $('date').value,
+        checkIn: $('checkIn').value,
+        checkOut: $('checkOut').value,
+        break: ( $('breakStart').value || $('breakEnd').value ) ? { start: $('breakStart').value || null, end: $('breakEnd').value || null } : null,
+        overtimeApproved: $('ot').checked
+      };
+    }
+
+    function render(result) {
+      $('empLabel').textContent = (result.employeeId || '—') + ' — ' + (result.date || '—');
+      $('summary').textContent = JSON.stringify(result, null, 2);
+      const pill = $('statusPill');
+      pill.textContent = result.status || '—';
+      pill.className = 'status ' + (result.status || 'error');
+      $('auditLog').textContent = result.auditLog || '—';
+    }
+
+    $('processBtn').addEventListener('click', () => {
+      const input = readForm();
+      let out;
+      try {
+        out = processAttendance(input);
+      } catch (e) {
+        out = { status: 'error', errorMessage: e.message || 'Unexpected' };
+      }
+      render(out);
+    });
+
+    $('sampleBtn').addEventListener('click', () => {
+      $('employeeId').value = 'EMP101';
+      $('date').value = '2025-01-20';
+      $('checkIn').value = '09:00';
+      $('checkOut').value = '18:30';
+      $('breakStart').value = '13:00';
+      $('breakEnd').value = '13:45';
+      $('ot').checked = true;
+    });
+
+    // expose default sample on load
+    window.addEventListener('load', () => $('sampleBtn').click());
+
+    // store the audit log variable used in finally
+    let resultAuditLog = null;
+  </script>
+</body>
+</html>
