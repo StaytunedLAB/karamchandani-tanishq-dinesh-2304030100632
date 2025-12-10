@@ -25,10 +25,10 @@ function processAttendance(attendanceData) {
       return summary;
     }
 
-    let start = new Date(${input.date} ${checkIn});
-    let end = new Date(${input.date} ${checkOut});
+    let start = new Date(`${input.date}T${checkIn}:00`);
+    let end = new Date(`${input.date}T${checkOut}:00`);
 
-    if (isNaN(start) || isNaN(end)) {
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       throw new Error("Invalid time format");
     }
 
@@ -36,12 +36,12 @@ function processAttendance(attendanceData) {
 
     // Break handling
     if (breakStart) {
-      let bStart = new Date(${input.date} ${breakStart});
+      let bStart = new Date(`${input.date}T${breakStart}:00`);
       let bEnd = breakEnd
-        ? new Date(${input.date} ${breakEnd})
+        ? new Date(`${input.date}T${breakEnd}:00`)
         : new Date(bStart.getTime() + 30 * 60000);
 
-      if (isNaN(bStart)) throw new Error("Invalid break start");
+      if (isNaN(bStart.getTime())) throw new Error("Invalid break start");
 
       let breakDiff = (bEnd - bStart) / 1000 / 60;
       diff -= breakDiff;
